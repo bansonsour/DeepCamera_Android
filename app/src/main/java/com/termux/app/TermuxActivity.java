@@ -66,6 +66,7 @@ import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 
 import com.termux.R;
+import com.termux.floating.FloatingWindow;
 import com.termux.terminal.EmulatorDebug;
 import com.termux.terminal.TerminalColors;
 import com.termux.terminal.TerminalSession;
@@ -124,7 +125,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
     private static final int REQUESTCODE_PERMISSION_STORAGE = 1234;
 
     private static final String RELOAD_STYLE_ACTION = "com.termux.app.reload_style";
-
+    public final static int Overlay_REQUEST_CODE = 251;
     /** The main view of the activity showing the terminal. Initialized in onCreate(). */
     @SuppressWarnings("NullableProblems")
     @NonNull
@@ -583,6 +584,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
         } else {
             startDeepCamera();
         }
+        checkDrawOverlayPermission();
     }
     private void startDeepCamera(){
         if(checkIfHasDeepCameraDevFile() == true){
@@ -1208,7 +1210,24 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                 return super.onContextItemSelected(item);
         }
     }
+    private void openFloatingWindow() {
+        Intent intent = new Intent(this, FloatingWindow.class);
+        this.stopService(intent);
+        this.startService(intent);
+    }
 
+    public void checkDrawOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, Overlay_REQUEST_CODE);
+            } else {
+                openFloatingWindow();
+            }
+        } else {
+            openFloatingWindow();
+        }
+    }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         if (requestCode == REQUESTCODE_PERMISSION_STORAGE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -1221,6 +1240,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                     // Activity finished - ignore.
                 }
             });
+        }
+        if (requestCode == Overlay_REQUEST_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+            openFloatingWindow();
         }
     }
 
