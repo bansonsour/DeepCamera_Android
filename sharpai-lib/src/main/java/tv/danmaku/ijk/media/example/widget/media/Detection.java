@@ -1,5 +1,6 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -13,6 +14,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.support.v8.renderscript.RenderScript;
+import android.text.SpannableStringBuilder;
 import android.util.Log;
 
 import com.mtcnn_as.FaceDetector;
@@ -102,7 +104,10 @@ public class Detection {
 
     private static final int PROCESS_FRAMES_AFTER_MOTION_DETECTED = 3;
 
-    private static final boolean SEND_WITH_FACE_JSON_MESSAGE_TO_DEEPCAMERA = false;
+    private static final boolean SEND_WITH_FACE_JSON_MESSAGE_TO_DEEPCAMERA = true;
+    private static final boolean POSE_ESTIMATION_HELPER_FOR_PERSON_IMAGE = true;
+
+    private ImageClassifier mPoseEstimator;
     static {
         if (OpenCVLoader.initDebug()) {
             Log.i(TAG, "OpenCV initialize success");
@@ -151,6 +156,23 @@ public class Detection {
         //mMOG2.setHistory(5);
         //mMOG2.setDetectShadows(false);
         //mMOG2.setComplexityReductionThreshold(0);
+
+        if(POSE_ESTIMATION_HELPER_FOR_PERSON_IMAGE){
+            try {
+                mPoseEstimator = new ImageClassifierFloatBodypose((Activity) mContext);
+                mPoseEstimator.setNumThreads(2);
+
+                //if(GpuDelegateHelper.isGpuDelegateAvailable()){
+                //    mPoseEstimator.useGpu();
+                //}
+                mPoseEstimator.useCPU();
+                //mPoseEstimator.useNNAPI();
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.e(TAG, "Error of pose estimation helper init");
+                mPoseEstimator = null;
+            }
+        }
     }
     class MyCallback implements Handler.Callback {
 
@@ -456,6 +478,12 @@ public class Detection {
             filename = file.getAbsolutePath();
             personInfo.put("personImagePath",filename);
 
+            if(POSE_ESTIMATION_HELPER_FOR_PERSON_IMAGE){
+                Bitmap resizedBmp = mMotionDetection.resizeBmp(personBmp,mPoseEstimator.getImageSizeX(),mPoseEstimator.getImageSizeY());
+                SpannableStringBuilder textToShow = new SpannableStringBuilder();
+                mPoseEstimator.classifyFrame(resizedBmp, textToShow);
+                Log.d(TAG,"POSE Estimation: "+textToShow);
+            }
             int num = 0;
             if(face_info != null && face_info.length > 0){
                 num = face_info[0];
