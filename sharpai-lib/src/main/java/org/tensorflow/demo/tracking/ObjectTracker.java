@@ -22,20 +22,23 @@ import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+
+import org.sharpai.aicamera.env.Logger;
+import org.sharpai.aicamera.env.Size;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+
 import javax.microedition.khronos.opengles.GL10;
-import org.sharpai.aicamera.env.Logger;
-import org.sharpai.aicamera.env.Size;
 
 /**
  * True object detector/tracker class that tracks objects across consecutive preview frames.
  * It provides a simplified Java interface to the analogous native object defined by
- * jni/client_vision/tracking/object_tracker.*.
+ * jni/client_vision/org.org.tensorflow.demo.tracking/object_tracker.*.
  *
  * Currently, the ObjectTracker is a singleton due to native code restrictions, and so must
  * be allocated by ObjectTracker.getInstance(). In addition, release() should be called
@@ -57,7 +60,7 @@ public class ObjectTracker {
       System.loadLibrary("tensorflow_demo");
       libraryFound = true;
     } catch (UnsatisfiedLinkError e) {
-      LOGGER.e("libtensorflow_demo.so not found, tracking unavailable");
+      LOGGER.e("libtensorflow_demo.so not found, org.tensorflow.demo.tracking unavailable");
     }
   }
 
@@ -207,7 +210,7 @@ public class ObjectTracker {
       final int frameWidth, final int frameHeight, final int rowStride, final boolean alwaysTrack) {
     if (!libraryFound) {
       LOGGER.e(
-          "Native object tracking support not found. "
+          "Native object org.org.tensorflow.demo.tracking support not found. "
               + "See tensorflow/examples/android/README.md for details.");
       return null;
     }
@@ -480,7 +483,7 @@ public class ObjectTracker {
 
   /**
    * A TrackedObject represents a native TrackedObject, and provides access to the
-   * relevant native tracking information available after every frame update. They may
+   * relevant native org.org.tensorflow.demo.tracking information available after every frame update. They may
    * be safely passed around and accessed externally, but will become invalid after
    * stopTracking() is called or the related creating ObjectTracker is deactivated.
    *
@@ -591,7 +594,7 @@ public class ObjectTracker {
 
     private void checkValidObject() {
       if (isDead) {
-        throw new RuntimeException("TrackedObject already removed from tracking!");
+        throw new RuntimeException("TrackedObject already removed from org.tensorflow.demo.tracking!");
       } else if (ObjectTracker.this != instance) {
         throw new RuntimeException("TrackedObject created with another ObjectTracker!");
       }

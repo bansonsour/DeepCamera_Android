@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -93,6 +94,18 @@ public class CameraControl {
         return c; // returns null if camera is unavailable
     }
 
+    protected int getScreenOrientation() {
+        switch (mActivity.getWindowManager().getDefaultDisplay().getRotation()) {
+            case Surface.ROTATION_270:
+                return 270;
+            case Surface.ROTATION_180:
+                return 180;
+            case Surface.ROTATION_90:
+                return 90;
+            default:
+                return 0;
+        }
+    }
     private static String getMacAddr() {
         try {
             List<NetworkInterface> all = Collections.list(NetworkInterface.getNetworkInterfaces());
@@ -138,7 +151,7 @@ public class CameraControl {
         mCamera = getCameraInstance();
 
         // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(mActivity, mCamera, mCameraInfo,mPersonView,mFaceView);
+        mPreview = new CameraPreview(mActivity, mCamera, mCameraInfo,mPersonView,mFaceView,getScreenOrientation());
         //FrameLayout preview = (FrameLayout) mActivity.findViewById(R.id.camera_preview);
         mFramePreview.addView(mPreview);
 

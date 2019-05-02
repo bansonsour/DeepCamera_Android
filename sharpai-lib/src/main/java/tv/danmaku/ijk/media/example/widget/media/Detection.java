@@ -14,12 +14,12 @@ import android.os.HandlerThread;
 import android.os.Message;
 import android.support.v8.renderscript.RenderScript;
 import android.util.Log;
+import android.view.Surface;
 import android.widget.ImageView;
 
 import com.mtcnn_as.FaceDetector;
 import com.sharpai.detector.Classifier;
 import com.sharpai.detector.Detector;
-import com.sharpai.detector.env.ImageUtils;
 import com.sharpai.pim.MotionDetectionRS;
 import com.tzutalin.dlib.Constants;
 import com.tzutalin.dlib.FaceDet;
@@ -38,13 +38,12 @@ import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.video.BackgroundSubtractor;
 import org.opencv.video.Video;
+import org.tensorflow.demo.tracking.MultiBoxTracker;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -113,6 +112,11 @@ public class Detection {
     private static final boolean SHOW_DETECTED_PERSON_FACE_FOR_DEBUG = true;
     private ImageView mPersonView;
     private ImageView mFaceView;
+
+    private MultiBoxTracker tracker;
+    private long timestamp = 0;
+    private int mOrientation;
+
     static {
         if (OpenCVLoader.initDebug()) {
             Log.i(TAG, "OpenCV initialize success");
@@ -120,11 +124,12 @@ public class Detection {
             Log.i(TAG, "OpenCV initialize failed");
         }
     }
-    public Detection(Context context, ImageView detectedPersonView , ImageView detectedFaceView){
+    public Detection(Context context, ImageView detectedPersonView , ImageView detectedFaceView, int orientation){
 
         mContext = context;
         mPersonView = detectedPersonView;
         mFaceView = detectedFaceView;
+        mOrientation = orientation;
 
         HandlerThread handlerThread = new HandlerThread("BackgroundThread");
         handlerThread.start();
@@ -166,6 +171,8 @@ public class Detection {
         if(SHOW_DETECTED_PERSON_FACE_FOR_DEBUG){
             mFaceDet = new FaceDet(Constants.getFaceShapeModelPath());
         }
+
+        tracker = new MultiBoxTracker(mContext);
     }
     class MyCallback implements Handler.Callback {
 
@@ -277,13 +284,13 @@ public class Detection {
         return 1.0*rect_1.width()*rect_2.height()/(rect_2.width()*rect_2.height());
 
     }
-    public boolean detectObjectChanges(Bitmap bmp){
+    public boolean detectObjectChanges(Bitmap resizedBmp){
 
         // Let's detect if there's big changes
         long tsMatStart = System.currentTimeMillis();
 
         Mat rgba = new Mat();
-        Bitmap resizedBmp = mMotionDetection.resizeBmp(bmp,DETECTION_IMAGE_WIDTH,DETECTION_IMAGE_HEIGHT);
+        //Bitmap resizedBmp = mMotionDetection.resizeBmp(bmp,DETECTION_IMAGE_WIDTH,DETECTION_IMAGE_HEIGHT);
         Utils.bitmapToMat(resizedBmp, rgba);
 
         Mat rgb = new Mat();
@@ -631,11 +638,50 @@ public class Detection {
         }
 
     }
+    public void handleBitmap(Bitmap image) {
+        int w = image.getWidth(), h = image.getHeight();
+        int[] rgb = new int[w * h];
+        byte[] yuv = new byte[w * h];
+
+        image.getPixels(rgb, 0, w, 0, 0, w, h);
+        populateYUVLuminanceFromRGB(rgb, yuv, w, h);
+    }
+    private void populateYUVLuminanceFromRGB(int[] rgb, byte[] yuv420sp, int width, int height) {
+        for (int i = 0; i < width * height; i++) {
+            float red = (rgb[i] >> 16) & 0xff;
+            float green = (rgb[i] >> 8) & 0xff;
+            float blue = (rgb[i]) & 0xff;
+            int luminance = (int) ((0.257f * red) + (0.504f * green) + (0.098f * blue) + 16);
+            yuv420sp[i] = (byte) (0xff & luminance);
+        }
+    }
     public void processBitmap(Bitmap bmp){
         long tsStart = System.currentTimeMillis();
         long tsEnd;
 
         boolean bigChanged = true;
+
+        Bitmap resizedBmp = mMotionDetection.resizeBmp(bmp,DETECTION_IMAGE_WIDTH,DETECTION_IMAGE_HEIGHT);
+        tsEnd = System.currentTimeMillis();
+        Log.v(TAG,"time diff (resize) "+(tsEnd-tsStart));
+
+        tsStart = System.currentTimeMillis();
+        ++timestamp;
+        int w = resizedBmp.getWidth(), h = resizedBmp.getHeight();
+        int[] rgb = new int[w * h];
+        byte[] yuv = new byte[w * h];
+
+        resizedBmp.getPixels(rgb, 0, w, 0, 0, w, h);
+        populateYUVLuminanceFromRGB(rgb, yuv, w, h);
+        tracker.onFrame(
+            DETECTION_IMAGE_WIDTH,
+            DETECTION_IMAGE_HEIGHT,
+            DETECTION_IMAGE_WIDTH,
+            mOrientation,
+            yuv,
+            timestamp);
+        tsEnd = System.currentTimeMillis();
+        Log.v(TAG,"time diff (tracker) "+(tsEnd-tsStart));
 
         //clean up pictures every 2 mins
         if (tsStart-mLastCleanPicsTimestamp > 2*60*1000) {
@@ -644,8 +690,9 @@ public class Detection {
             deleteAllCapturedPics();
         }
 
+        tsStart = System.currentTimeMillis();
         if(mPreviousPersonNum == 0){
-            bigChanged = mMotionDetection.detect(bmp);
+            bigChanged = mMotionDetection.detect(resizedBmp);
             //VideoActivity.setMotionStatus(bigChanged);
             tsEnd = System.currentTimeMillis();
 
@@ -658,9 +705,9 @@ public class Detection {
                     //bmp.recycle();
                     //VideoActivity.setMotionStatus(false);
                     //VideoActivity.setNumberOfFaces(0);
-                    boolean ifChanged = detectObjectChanges(bmp);
+                    boolean ifChanged = detectObjectChanges(resizedBmp);
                     Log.d(TAG,"Object changed after person leaving: "+ifChanged);
-                    checkIfNeedSendDummyTask(bmp);
+                    checkIfNeedSendDummyTask(resizedBmp);
                     if(!ifChanged && mRecording){
                         //FFmpeg.cancel();
                         //String result = FFmpeg.getLastCommandOutput();
@@ -672,17 +719,20 @@ public class Detection {
                 mSavingCounter=PROCESS_FRAMES_AFTER_MOTION_DETECTED;
             }
         }
+
         tsStart = System.currentTimeMillis();
-        List<Classifier.Recognition> result =  mDetector.processImage(bmp);
+        List<Classifier.Recognition> result =  mDetector.processImage(resizedBmp);
         int personNum = result.size();
         mPreviousPersonNum = personNum;
         //VideoActivity.setNumberOfPerson(personNum);
         tsEnd = System.currentTimeMillis();
         Log.v(TAG,"time diff (OD) "+(tsEnd-tsStart));
 
+        tracker.trackResults(result, yuv, timestamp);
+
         if(personNum>0){
             try {
-                doFaceDetectionAndSendTask(result,bmp);
+                doFaceDetectionAndSendTask(result,resizedBmp);
             } catch (JSONException e) {
                 e.printStackTrace();
                 Log.e(TAG,"Wired to have json exception");
@@ -708,7 +758,7 @@ public class Detection {
             }
         }
 
-        checkIfNeedSendDummyTask(bmp);
+        checkIfNeedSendDummyTask(resizedBmp);
 
         return;
     }

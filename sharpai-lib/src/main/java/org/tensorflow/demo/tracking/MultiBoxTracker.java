@@ -28,13 +28,15 @@ import android.text.TextUtils;
 import android.util.Pair;
 import android.util.TypedValue;
 import android.widget.Toast;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import org.sharpai.aicamera.Classifier.Recognition;
+
+import com.sharpai.detector.Classifier.Recognition;
 import org.sharpai.aicamera.env.BorderedText;
 import org.sharpai.aicamera.env.ImageUtils;
 import org.sharpai.aicamera.env.Logger;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 
 /**
  * A tracker wrapping ObjectTracker that also handles non-max suppression and matching existing
@@ -53,10 +55,10 @@ public class MultiBoxTracker {
 
   // Allow replacement of the tracked box with new results if
   // correlation has dropped below this level.
-  private static final float MARGINAL_CORRELATION = 0.75f;
+  private static final float MARGINAL_CORRELATION = 0.55f;
 
   // Consider object to be lost if correlation falls below this threshold.
-  private static final float MIN_CORRELATION = 0.3f;
+  private static final float MIN_CORRELATION = 0.1f;
 
   private static final int[] COLORS = {
     Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW, Color.CYAN, Color.MAGENTA, Color.WHITE,
@@ -214,7 +216,7 @@ public class MultiBoxTracker {
 
       if (objectTracker == null) {
         String message =
-            "Object tracking support not found. "
+            "Object org.org.tensorflow.demo.tracking support not found. "
                 + "See tensorflow/examples/android/README.md for details.";
         Toast.makeText(context, message, Toast.LENGTH_LONG).show();
         logger.e(message);
@@ -234,7 +236,7 @@ public class MultiBoxTracker {
       final ObjectTracker.TrackedObject trackedObject = recognition.trackedObject;
       final float correlation = trackedObject.getCurrentCorrelation();
       if (correlation < MIN_CORRELATION) {
-        logger.v("Removing tracked object %s because NCC is %.2f", trackedObject, correlation);
+        logger.i("Removing tracked object %s because NCC is %.2f", trackedObject, correlation);
         trackedObject.stopTracking();
         trackedObjects.remove(recognition);
 
@@ -259,7 +261,7 @@ public class MultiBoxTracker {
       final RectF detectionScreenRect = new RectF();
       rgbFrameToScreen.mapRect(detectionScreenRect, detectionFrameRect);
 
-      logger.v(
+      logger.i(
           "Result! Frame: " + result.getLocation() + " mapped to screen:" + detectionScreenRect);
 
       screenRects.add(new Pair<Float, RectF>(result.getConfidence(), detectionScreenRect));
@@ -273,7 +275,7 @@ public class MultiBoxTracker {
     }
 
     if (rectsToTrack.isEmpty()) {
-      logger.v("Nothing to track, aborting.");
+      logger.i("Nothing to track, aborting.");
       return;
     }
 
@@ -307,12 +309,12 @@ public class MultiBoxTracker {
         objectTracker.trackObject(potential.second.getLocation(), timestamp, frameCopy);
 
     final float potentialCorrelation = potentialObject.getCurrentCorrelation();
-    logger.v(
+    logger.i(
         "Tracked object went from %s to %s with correlation %.2f",
         potential.second, potentialObject.getTrackedPositionInPreviewFrame(), potentialCorrelation);
 
     if (potentialCorrelation < MARGINAL_CORRELATION) {
-      logger.v("Correlation too low to begin tracking %s.", potentialObject);
+      logger.i("Correlation too low to begin tracking %s.", potentialObject);
       potentialObject.stopTracking();
       return;
     }
@@ -374,16 +376,16 @@ public class MultiBoxTracker {
         }
       }
       if (recogToReplace != null) {
-        logger.v("Found non-intersecting object to remove.");
+        logger.i("Found non-intersecting object to remove.");
         removeList.add(recogToReplace);
       } else {
-        logger.v("No non-intersecting object found to remove");
+        logger.i("No non-intersecting object found to remove");
       }
     }
 
     // Remove everything that got intersected.
-    for (final TrackedRecognition trackedRecognition : removeList) {
-      logger.v(
+    /*for (final TrackedRecognition trackedRecognition : removeList) {
+      logger.i(
           "Removing tracked object %s with detection confidence %.2f, correlation %.2f",
           trackedRecognition.trackedObject,
           trackedRecognition.detectionConfidence,
@@ -393,7 +395,7 @@ public class MultiBoxTracker {
       if (trackedRecognition != recogToReplace) {
         availableColors.add(trackedRecognition.color);
       }
-    }
+    }*/
 
     if (recogToReplace == null && availableColors.isEmpty()) {
       logger.e("No room to track this object, aborting.");
@@ -402,7 +404,7 @@ public class MultiBoxTracker {
     }
 
     // Finally safe to say we can track this object.
-    logger.v(
+    logger.i(
         "Tracking object %s (%s) with detection confidence %.2f at position %s",
         potentialObject,
         potential.second.getTitle(),

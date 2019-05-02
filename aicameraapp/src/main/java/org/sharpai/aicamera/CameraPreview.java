@@ -41,7 +41,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     private Detection mDetection;
 
     public CameraPreview(Context context, Camera camera, Camera.CameraInfo cameraInfo,
-                         ImageView detectedPersonView , ImageView detectedFaceView) {
+                         ImageView detectedPersonView , ImageView detectedFaceView, int orientation) {
         super(context);
         mCamera = camera;
         mCameraInfo = cameraInfo;
@@ -56,7 +56,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
         mPreviewCallback = new PreviewCallback();
         // mLibyuvCore = new LibyuvCore();
-        mDetection = new Detection(context,detectedPersonView,detectedFaceView);
+        mDetection = new Detection(context,detectedPersonView,detectedFaceView,orientation);
     }
 
     private void adjustCameraOrientation() {

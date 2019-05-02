@@ -57,11 +57,6 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
-        <activity android:name="org.sharpai.aicamera.MainActivity"
-            android:screenOrientation="landscape"
-            android:label="@string/activity_name_detection">
-        </activity>
-
         <activity
             android:name="org.sharpai.app.TermuxHelpActivity"
             android:exported="false"
